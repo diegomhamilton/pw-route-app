@@ -102,16 +102,16 @@ else:
     start_coords = (start_x, start_y)
     start_mat = None  # no highlight if user sets manually
 
-# Markers for different materials
-markers = ['X', 'o', 's', '^', 'v', 'P', '*', 'D', '<', '>']
-unique_names_all = sorted(list(set(m.name for m in (materials_materiais + materials_ervas))))
-marker_map = {name: markers[i % len(markers)] for i, name in enumerate(unique_names_all)}
-
 
 # Plotting function
 def plot_route(route_mats, map_image, show_arrows=False, zoom=True):
+    # Markers for different materials
+    markers = ['X', 'o', 's', '^', 'v', 'P', '*', 'D', '<', '>']
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
-    color_map = {name: colors[i % len(colors)] for i, name in enumerate(unique_names_all)}
+    unique_names_from_route = list(set([m.name for m in route_mats]))
+    marker_map = {name: markers[i % len(markers)] for i, name in enumerate(unique_names_from_route)}
+    color_map = {name: colors[i % len(colors)] for i, name in enumerate(unique_names_from_route)}
+ 
     fig, ax = map_fig(map_image=map_image)
 
     # Plot materials with optional labels
