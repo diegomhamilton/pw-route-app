@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import random
-from model.pwmaterial import parse_data_from_csv
+from model.pwmaterial import parse_data_from_json
 from route_generator import generate_route
 
 
@@ -16,9 +16,11 @@ def xy_to_pixel(x, y):
 # Load data & image
 @st.cache_data
 def load_data():
-    materials = parse_data_from_csv("support_files/materials_coords.csv")
+    # reads from JSON now
+    materials_materiais = parse_data_from_json("support_files/materials.json", category="Materiais")
+    materials_ervas = parse_data_from_json("support_files/materials.json", category="Ervas")
     map_img = Image.open("support_files/map.jpg")
-    return materials, map_img
+    return materials_materiais, materials_ervas, map_img
 
 
 def map_fig(map_image):
@@ -27,22 +29,59 @@ def map_fig(map_image):
     return fig, ax
 
 
-materials, map_img = load_data()
+materials_materiais, materials_ervas, map_img = load_data()
 
 # Streamlit UI
 st.title("Material Route Viewer")
 
 # Sidebar filters
-unique_names = sorted(list(set(mat.name for mat in materials)))
-selected_names = st.sidebar.multiselect(
-    "Select Materials to Display (all tiers):",
-    unique_names,
-    default=unique_names
+st.sidebar.subheader("Tier Pre-filter")
+all_tiers = sorted(list(set([m.tier for m in materials_materiais + materials_ervas])))
+selected_tiers = st.sidebar.multiselect(
+    "Tiers to include:",
+    all_tiers,
+    default=all_tiers
 )
+
+st.sidebar.subheader("Choose by Category")
+unique_mat_names = sorted(list(set(m.name for m in materials_materiais if m.tier in selected_tiers)))
+unique_erva_names = sorted(list(set(e.name for e in materials_ervas if e.tier in selected_tiers)))
+
+selected_mat_names = st.sidebar.multiselect(
+    "Materiais (names):",
+    unique_mat_names,
+    default=unique_mat_names
+)
+selected_erva_names = st.sidebar.multiselect(
+    "Ervas (names):",
+    unique_erva_names,
+    default=[]
+)
+
+# Filter items by selected tiers and names
+filtered_materials = [
+    m for m in materials_materiais
+    if m.tier in selected_tiers and m.name in selected_mat_names
+] + [
+    e for e in materials_ervas
+    if e.tier in selected_tiers and e.name in selected_erva_names
+]
+
+# Early exit if no materials selected
+if len(filtered_materials) == 0:
+    st.warning("No materials selected. Please choose at least one item.")
+    st.stop()
 
 # Route parameters
 st.sidebar.subheader("Route Parameters")
-n_mats = st.sidebar.number_input("Number of Materials", value=20, min_value=2, max_value=50)
+available = len(filtered_materials)
+default_n = min(20, available) if available > 0 else 1
+n_mats = st.sidebar.number_input(
+    "Number of Materials",
+    value=default_n,
+    min_value=1,
+    max_value=max(1, available)
+)
 
 # Start coordinates (optional)
 st.sidebar.subheader("Start Coordinates")
@@ -55,9 +94,6 @@ show_arrows = st.sidebar.checkbox("Show Route Arrows", value=True)
 # Zoom toggle
 zoom = st.sidebar.checkbox("Zoom Route View", value=True)
 
-# Filter materials
-filtered_materials = [m for m in materials if m.name in selected_names]
-
 # Determine start material and coordinates
 if start_x is None or start_y is None:
     start_mat = random.choice(filtered_materials)
@@ -68,19 +104,20 @@ else:
 
 # Markers for different materials
 markers = ['X', 'o', 's', '^', 'v', 'P', '*', 'D', '<', '>']
-marker_map = {name: markers[i % len(markers)] for i, name in enumerate(unique_names)}
+unique_names_all = sorted(list(set(m.name for m in (materials_materiais + materials_ervas))))
+marker_map = {name: markers[i % len(markers)] for i, name in enumerate(unique_names_all)}
 
 
 # Plotting function
 def plot_route(route_mats, map_image, show_arrows=False, zoom=True):
     colors = ['red', 'blue', 'green', 'orange', 'purple', 'brown', 'cyan', 'magenta']
-    color_map = {name: colors[i % len(colors)] for i, name in enumerate(unique_names)}
+    color_map = {name: colors[i % len(colors)] for i, name in enumerate(unique_names_all)}
     fig, ax = map_fig(map_image=map_image)
 
     # Plot materials with optional labels
     for mat in route_mats:
         px, py = xy_to_pixel(*mat.coordinates)
-        size = 12 if mat == start_mat else 8
+        size = 100 if mat == start_mat else 12
         ax.scatter(px, py, c=color_map[mat.name], marker=marker_map[mat.name],
                    s=size, label=mat.name)
 
@@ -121,7 +158,7 @@ def plot_route(route_mats, map_image, show_arrows=False, zoom=True):
         xs, ys = zip(*[xy_to_pixel(*m.coordinates) for m in route_mats])
         offset = 100
         ax.set_xlim(min(xs) - offset, max(xs) + offset)
-        ax.set_ylim(max(ys) + 2*offset, min(ys) - offset)
+        ax.set_ylim(max(ys) + offset, min(ys) - 2*offset)
 
     ax.axis('off')
     plt.tight_layout()

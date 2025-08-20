@@ -5,45 +5,45 @@ from model.pwmaterial import parse_data_from_csv
 
 def generate_route(mats, start_coords=None, N=20):
     """
-    Generate a route of length N from mats starting at start_coord (if given).
-    Returns (route_coords, route_mats).
+    Generate a nearest-neighbor route of length N from mats starting at
+    the closest point to start_coords (if given). Returns (route_coords, route_mats).
+
+    Uses index-based selection to avoid float-equality issues and considers
+    full Euclidean distance across both axes.
     """
-    coordinates = np.array([m.coordinates for m in mats])
+    if not mats:
+        return np.array([]), []
 
-    # pick start point
+    # Ensure numeric array of shape (n, 2)
+    coords = np.array([[float(m.coordinates[0]), float(m.coordinates[1])] for m in mats], dtype=float)
+
+    # Determine starting index
     if start_coords is None:
-        curr_mat = coordinates[0]
+        curr_idx = 0
     else:
-        # find closest coordinate to given start_coord
-        dists = np.linalg.norm(coordinates - np.array(start_coords), axis=1)
-        curr_mat = coordinates[np.argmin(dists)]
+        start_vec = np.array(start_coords, dtype=float)
+        dists = np.linalg.norm(coords - start_vec, axis=1)
+        curr_idx = int(np.argmin(dists))
 
-    remaining_coordinates = coordinates.copy()
-    route_coords = []
+    unvisited = list(range(len(mats)))
+    route_indices = []
 
-    while N > 0 and len(remaining_coordinates) > 0:
-        route_coords.append(curr_mat)
-
-        # remove current from remaining
-        mask = ~np.all(remaining_coordinates == curr_mat, axis=1)
-        remaining_coordinates = remaining_coordinates[mask]
-
-        if len(remaining_coordinates) == 0:
+    steps = int(min(N, len(unvisited)))
+    for _ in range(steps):
+        route_indices.append(curr_idx)
+        unvisited.remove(curr_idx)
+        if not unvisited:
             break
+        # Compute distances from current to all unvisited
+        diffs = coords[unvisited] - coords[curr_idx]
+        dists = np.linalg.norm(diffs, axis=1)
+        next_pos = int(np.argmin(dists))
+        curr_idx = unvisited[next_pos]
 
-        # choose next closest
-        dists = np.linalg.norm(remaining_coordinates - curr_mat, axis=1)
-        next_idx = np.argmin(dists)
-        curr_mat = remaining_coordinates[next_idx]
+    route_coords = coords[route_indices]
+    route_mats = [mats[i] for i in route_indices]
 
-        N -= 1
-
-    # Get mats in the same order as route_coords
-    route_mats = [
-        m for rc in route_coords for m in mats if np.array_equal(m.coordinates, rc)
-    ]
-
-    return np.array(route_coords), route_mats
+    return route_coords, route_mats
 
 
 def plot_route_on_map(route_coords, map_image, offset=50):
@@ -61,11 +61,12 @@ def plot_route_on_map(route_coords, map_image, offset=50):
     ax.plot(xs, ys, 'o-', color="blue")
 
     # bounding box + offset
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
+    if xs and ys:
+        min_x, max_x = min(xs), max(xs)
+        min_y, max_y = min(ys), max(ys)
 
-    ax.set_xlim(min_x - offset, max_x + offset)
-    ax.set_ylim(max_y + offset, min_y - offset)  # y is inverted in images
+        ax.set_xlim(min_x - offset, max_x + offset)
+        ax.set_ylim(max_y + offset, min_y - offset)  # y is inverted in images
 
     ax.axis("off")
     plt.tight_layout()
