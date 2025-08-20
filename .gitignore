@@ -1,0 +1,7 @@
+pw_map_env/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+# optional: ignore large support files if you don't want them in repo
+# support_files/map.jpg
