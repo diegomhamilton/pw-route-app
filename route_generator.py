@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from pwmaterial import parse_data_from_csv
+from model.pwmaterial import parse_data_from_csv
 
 
 def generate_route(mats, start_coords=None, N=20):

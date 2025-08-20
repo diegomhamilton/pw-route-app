@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
 import random
-from pwmaterial import parse_data_from_csv
-from gerador_de_rotas_v2_zoom import generate_route
+from model.pwmaterial import parse_data_from_csv
+from route_generator import generate_route
 
 
 def xy_to_pixel(x, y):
